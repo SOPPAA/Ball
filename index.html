@@ -274,8 +274,17 @@
         return;
       }
 
+            const stateOrder = { in: 1, pre: 2, post: 3 };
+      const sortedEvents = [...events].sort((a, b) => {
+        const orderA = stateOrder[a.status.type.state] || 4;
+        const orderB = stateOrder[b.status.type.state] || 4;
+        if (orderA !== orderB) return orderA - orderB;
+        return new Date(a.date) - new Date(b.date);
+      });
+
       let html = '';
-      events.forEach(event => {
+      sortedEvents.forEach(event => {
+
         const comp = event.competitions[0];
         const home = comp.competitors.find(c => c.homeAway === 'home');
         const away = comp.competitors.find(c => c.homeAway === 'away');
