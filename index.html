@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0b1120">
+  <title>LiveScore Pro</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      --bg-main: #0b1120;
+      --bg-card: #161f33;
+      --bg-card-hover: #1e293b;
+      --border: #26334d;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --accent: #10b981;
+      --live: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: var(--bg-main); color: var(--text-primary); padding-bottom: 40px; }
+
+    /* Header */
+    header {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(11, 17, 32, 0.92); backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px; display: flex; justify-content: space-between; align-items: center;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; letter-spacing: 0.3px; }
+    .brand svg { width: 24px; height: 24px; color: var(--accent); }
+
+    .header-actions { display: flex; gap: 8px; }
+    .icon-btn {
+      background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);
+      padding: 8px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;
+      font-size: 0.85rem; font-weight: 500; transition: 0.2s;
+    }
+    .icon-btn:hover { background: var(--bg-card-hover); }
+    .icon-btn.active { border-color: var(--accent); color: var(--accent); }
+    .icon-btn svg { width: 16px; height: 16px; }
+
+    /* League Tabs */
+    .league-bar {
+      display: flex; gap: 8px; overflow-x: auto; padding: 12px 16px;
+      border-bottom: 1px solid var(--border); scrollbar-width: none;
+    }
+    .league-bar::-webkit-scrollbar { display: none; }
+    .league-tab {
+      background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary);
+      padding: 8px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 600;
+      white-space: nowrap; cursor: pointer; transition: 0.2s;
+    }
+    .league-tab.active { background: var(--accent); color: #052e16; border-color: var(--accent); }
+
+    /* Status Bar */
+    .status-bar {
+      max-width: 680px; margin: 12px auto 0; padding: 0 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.8rem; color: var(--text-secondary);
+    }
+    .status-indicator { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+    .dot.live { background: var(--live); animation: pulse 1.5s infinite; }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    /* Match List */
+    main { max-width: 680px; margin: 12px auto; padding: 0 16px; display: flex; flex-direction: column; gap: 10px; }
+
+    .match-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 16px; transition: 0.2s;
+    }
+    .match-card.is-live { border-left: 3px solid var(--live); }
+
+    .match-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 12px; font-size: 0.78rem; color: var(--text-secondary);
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 8px; border-radius: 6px; font-weight: 600; font-size: 0.75rem;
+    }
+    .badge.live { background: rgba(239, 68, 68, 0.15); color: var(--live); }
+    .badge.finished { background: rgba(148, 163, 184, 0.15); color: var(--text-secondary); }
+    .badge.upcoming { background: rgba(16, 185, 129, 0.12); color: var(--accent); }
+
+    .match-body { display: flex; flex-direction: column; gap: 10px; }
+    .team-row { display: flex; justify-content: space-between; align-items: center; }
+    .team-info { display: flex; align-items: center; gap: 10px; }
+    .team-logo { width: 24px; height: 24px; object-fit: contain; }
+    .team-name { font-size: 0.95rem; font-weight: 600; }
+    .team-name.winner { color: var(--text-primary); }
+    .team-name.loser { color: var(--text-secondary); }
+    .team-score { font-size: 1.15rem; font-weight: 700; min-width: 24px; text-align: right; }
+    .is-live .team-score { color: var(--live); }
+
+    .empty-state {
+      text-align: center; padding: 48px 20px; color: var(--text-secondary);
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+    }
+    .empty-state svg { width: 40px; height: 40px; margin-bottom: 12px; opacity: 0.5; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <!-- Football / Pitch SVG Icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polygon points="12 7 16.5 10.5 14.8 16 9.2 16 7.5 10.5"></polygon>
+        <line x1="12" y1="2" x2="12" y2="7"></line>
+        <line x1="21.5" y1="9" x2="16.5" y2="10.5"></line>
+        <line x1="18" y1="20" x2="14.8" y2="16"></line>
+        <line x1="6" y1="20" x2="9.2" y2="16"></line>
+        <line x1="2.5" y1="9" x2="7.5" y2="10.5"></line>
+      </svg>
+      <span>LIVESCORE</span>
+    </div>
+
+    <div class="header-actions">
+      <button id="notifyBtn" class="icon-btn" onclick="enableNotifications()">
+        <!-- Bell SVG -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <span id="notifyText">เปิดแจ้งเตือน</span>
+      </button>
+
+      <button class="icon-btn" onclick="fetchScores(true)" title="รีเฟรชทันที">
+        <!-- Refresh SVG -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <nav class="league-bar" id="leagueBar">
+    <button class="league-tab active" data-league="eng.1">Premier League</button>
+    <button class="league-tab" data-league="esp.1">La Liga</button>
+    <button class="league-tab" data-league="ger.1">Bundesliga</button>
+    <button class="league-tab" data-league="ita.1">Serie A</button>
+    <button class="league-tab" data-league="uefa.champions">Champions League</button>
+    <button class="league-tab" data-league="tha.1">Thai League</button>
+  </nav>
+
+  <div class="status-bar">
+    <div class="status-indicator">
+      <span class="dot"></span>
+      <span id="lastUpdated">กำลังโหลดข้อมูล...</span>
+    </div>
+    <button onclick="testNotification()" style="background:none;border:none;color:var(--text-secondary);font-size:0.78rem;cursor:pointer;text-decoration:underline;">
+      ทดสอบแจ้งเตือน
+    </button>
+  </div>
+
+  <main id="matchList"></main>
+
+  <script>
+    let currentLeague = 'eng.1';
+    let previousScores = {}; // เก็บสกอร์รอบก่อนหน้าเพื่อตรวจจับประตู
+    let swRegistration = null;
+
+    // 1. ลงทะเบียน Service Worker สำหรับ PWA และการแจ้งเตือน
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        swRegistration = reg;
+      }).catch(err => console.error('SW Error:', err));
+    }
+
+    // ตรวจสอบสถานะสิทธิ์แจ้งเตือนเมื่อเปิดเว็บ
+    function updateNotifyUI() {
+      const btn = document.getElementById('notifyBtn');
+      const text = document.getElementById('notifyText');
+      if (Notification.permission === 'granted') {
+        btn.classList.add('active');
+        text.textContent = 'แจ้งเตือนทำงาน';
+      }
+    }
+    updateNotifyUI();
+
+    // 2. ขอสิทธิ์แจ้งเตือน
+    async function enableNotifications() {
+      if (!('Notification' in window)) {
+        alert('เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน');
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        updateNotifyUI();
+        sendNotification('เปิดการแจ้งเตือนสำเร็จ', 'ระบบจะแจ้งเตือนทันทีเมื่อมีการทำประตู');
+      }
+    }
+
+    // 3. ฟังก์ชันยิงแจ้งเตือน (รองรับทั้ง PWA บนมือถือและ Desktop)
+    function sendNotification(title, body) {
+      if (Notification.permission !== 'granted') return;
+      const options = {
+        body: body,
+        vibrate: [200, 100, 200],
+        tag: 'goal-alert-' + Date.now()
+      };
+      if (swRegistration) {
+        swRegistration.showNotification(title, options);
+      } else {
+        new Notification(title, options);
+      }
+    }
+
+    function testNotification() {
+      if (Notification.permission !== 'granted') {
+        enableNotifications();
+      } else {
+        sendNotification('GOAL! Arsenal 2 - 1 Chelsea', 'อัปเดตสกอร์สดจากระบบทดสอบ');
+      }
+    }
+
+    // 4. เปลี่ยนลีก
+    document.querySelectorAll('.league-tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        document.querySelectorAll('.league-tab').forEach(t => t.classList.remove('active'));
+        e.target.classList.add('active');
+        currentLeague = e.target.dataset.league;
+        previousScores = {}; // รีเซ็ตสกอร์เก่าเมื่อเปลี่ยนลีก
+        fetchScores(true);
+      });
+    });
+
+    // 5. ดึงข้อมูลจาก ESPN Public API
+    async function fetchScores(showLoading = false) {
+      const container = document.getElementById('matchList');
+      if (showLoading) {
+        container.innerHTML = '<div class="empty-state">กำลังดึงข้อมูลล่าสุด...</div>';
+      }
+
+      try {
+        const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/${currentLeague}/scoreboard`;
+        const res = await fetch(url);
+        const data = await res.json();
+        renderMatches(data.events || []);
+
+        const now = new Date();
+        document.getElementById('lastUpdated').textContent =
+          `อัปเดตล่าสุด ${now.toLocaleTimeString('th-TH')} (ทุก 15 วินาที)`;
+      } catch (err) {
+        container.innerHTML = '<div class="empty-state">ไม่สามารถเชื่อมต่อข้อมูลได้ในขณะนี้</div>';
+      }
+    }
+
+    // 6. แสดงผลและตรวจจับประตู
+    function renderMatches(events) {
+      const container = document.getElementById('matchList');
+      if (events.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="8" y1="12" x2="16" y2="12"></line>
+            </svg>
+            <div>ไม่มีโปรแกรมการแข่งขันในช่วงเวลานี้</div>
+          </div>`;
+        return;
+      }
+
+      let html = '';
+      events.forEach(event => {
+        const comp = event.competitions[0];
+        const home = comp.competitors.find(c => c.homeAway === 'home');
+        const away = comp.competitors.find(c => c.homeAway === 'away');
+        const status = event.status.type;
+
+        const homeScore = parseInt(home.score || 0);
+        const awayScore = parseInt(away.score || 0);
+        const matchId = event.id;
+
+        // ตรวจจับการทำประตู (ถ้ามีข้อมูลรอบก่อนหน้า และสกอร์เพิ่มขึ้น)
+        if (previousScores[matchId] && status.state === 'in') {
+          const prev = previousScores[matchId];
+          if (homeScore > prev.home || awayScore > prev.away) {
+            const scorerTeam = homeScore > prev.home ? home.team.shortDisplayName : away.team.shortDisplayName;
+            sendNotification(
+              `GOAL! ${scorerTeam} ทำประตูได้`,
+              `${home.team.shortDisplayName} ${homeScore} - ${awayScore} ${away.team.shortDisplayName} (${event.status.displayClock})`
+            );
+          }
+        }
+        previousScores[matchId] = { home: homeScore, away: awayScore };
+
+        // สถานะการแข่งขัน
+        let badgeClass = 'upcoming';
+        let badgeText = new Date(event.date).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+        let isLiveClass = '';
+
+        if (status.state === 'in') {
+          badgeClass = 'live';
+          badgeText = `<span class="dot live"></span> LIVE ${event.status.displayClock}`;
+          isLiveClass = 'is-live';
+        } else if (status.state === 'post') {
+          badgeClass = 'finished';
+          badgeText = status.shortDetail; // เช่น FT
+        }
+
+        const scoreDisplayHome = status.state === 'pre' ? '-' : homeScore;
+        const scoreDisplayAway = status.state === 'pre' ? '-' : awayScore;
+
+        html += `
+          <div class="match-card ${isLiveClass}">
+            <div class="match-header">
+              <span>${event.shortName}</span>
+              <span class="badge ${badgeClass}">${badgeText}</span>
+            </div>
+            <div class="match-body">
+              <div class="team-row">
+                <div class="team-info">
+                  <img class="team-logo" src="${home.team.logo}" alt="">
+                  <span class="team-name">${home.team.displayName}</span>
+                </div>
+                <span class="team-score">${scoreDisplayHome}</span>
+              </div>
+              <div class="team-row">
+                <div class="team-info">
+                  <img class="team-logo" src="${away.team.logo}" alt="">
+                  <span class="team-name">${away.team.displayName}</span>
+                </div>
+                <span class="team-score">${scoreDisplayAway}</span>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // เริ่มต้นดึงข้อมูลทันที และตั้งเวลาอัปเดตทุก 15 วินาที
+    fetchScores(true);
+    setInterval(() => fetchScores(false), 15000);
+  </script>
+</body>
+</html>
